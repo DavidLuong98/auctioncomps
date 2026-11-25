@@ -298,7 +298,7 @@ async function loadAll(force){
     setStatus(null,`${ROWS.length.toLocaleString()} auctions · data from ${mins<1?'just now':mins<60?mins+' min ago':Math.round(mins/60)+' h ago'}`);
   }catch(e){
     if(e.name==='AbortError'){setStatus(null,`Stopped. Showing the ${ROWS.length.toLocaleString()} auctions loaded so far.`)}
-    else setStatus(null,'Bring a Trailer stopped answering partway through. Wait a minute, then press Refresh.',true);
+    else setStatus(null,`Bring a Trailer stopped answering partway through. Showing the ${ROWS.length.toLocaleString()} auctions loaded so far. Wait a minute, then press Refresh to get the rest.`,true);
   }finally{if(abort===ctl){abort=null;$('#stop').hidden=true;$('#refresh').hidden=false;$('#share').hidden=false}}
 }
 function tag(rows,m){for(const r of rows){r.model=m.id;r.mt=m.title}return rows}

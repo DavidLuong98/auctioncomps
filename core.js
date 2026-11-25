@@ -5,7 +5,9 @@
   const PER_PAGE = 60;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  async function getJSON(url, params, tries = 4) {
+  // Retries with exponential backoff (2s, 4s, 8s, 16s, 32s). 403/429/5xx and network errors are
+  // treated as throttling; other 4xx mean a bad request and fail immediately.
+  async function getJSON(url, params, tries = 6) {
     const u = new URL(url);
     for (const [k, v] of params) u.searchParams.append(k, v);
     for (let i = 0; i < tries; i++) {
@@ -13,8 +15,8 @@
       try { r = await fetch(u, { credentials: 'omit' }); }
       catch (e) { if (i === tries - 1) throw e; }
       if (r && r.ok) return await r.json();
-      if (r && r.status !== 429 && r.status < 500) throw new Error('BaT API returned HTTP ' + r.status);
-      await sleep(1500 * (i + 1));
+      if (r && r.status !== 403 && r.status !== 429 && r.status < 500) throw new Error('BaT API returned HTTP ' + r.status);
+      if (i < tries - 1) await sleep(2000 * 2 ** i);
     }
     throw new Error('Request failed');
   }
@@ -77,10 +79,13 @@
     let page = 1, pages = 1;
     while (page <= pages) {
       if (signal && signal.aborted) throw new DOMException('Stopped', 'AbortError');
-      let d = await getJSON(API + '/listings-filter', [['page', page], ['per_page', PER_PAGE], ['get_items', 1], ['get_stats', 0], ...baseParams(ids)]);
-      if (!(d.items || []).length && d.page_current == null && page > 1) {   // throttled: BaT returns an empty page
-        await sleep(5000);
-        d = await getJSON(API + '/listings-filter', [['page', page], ['per_page', PER_PAGE], ['get_items', 1], ['get_stats', 0], ...baseParams(ids)]);
+      const req = () => getJSON(API + '/listings-filter', [['page', page], ['per_page', PER_PAGE], ['get_items', 1], ['get_stats', 0], ...baseParams(ids)]);
+      let d = await req();
+      // Throttled: BaT answers 200 with an empty page. Wait longer each time, up to ~75s in total.
+      for (let wait = 5000; !(d.items || []).length && d.page_current == null && page > 1 && wait <= 40000; wait *= 2) {
+        if (signal && signal.aborted) throw new DOMException('Stopped', 'AbortError');
+        await sleep(wait);
+        d = await req();
       }
       if (d.pages_total) pages = d.pages_total;
       (d.items || []).forEach(it => out.set(it.id, it));
