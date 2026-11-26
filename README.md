@@ -1,5 +1,7 @@
 # AuctionComps
 
+[![CI](https://github.com/DavidLuong98/auctioncomps/actions/workflows/ci.yml/badge.svg)](https://github.com/DavidLuong98/auctioncomps/actions/workflows/ci.yml)
+
 Filter completed Bring a Trailer auctions by mileage, price, model year, transmission, body, color, country and more, for any model. BaT's own results page has none of these filters.
 
 Search for a model, or paste a model page URL like `https://bringatrailer.com/porsche/996-gt3/`. You can add several models to compare them. Umbrella pages such as `/mazda/miata/` expand into their generations automatically.
@@ -32,6 +34,17 @@ The API gives title, price, sold/unsold, end date, thumbnail, no-reserve flag, c
 python3 -m http.server 8765
 # open http://127.0.0.1:8765
 ```
+
+## Running tests
+
+```sh
+node --test                  # parser unit tests + syntax check of the inline UI script
+node scripts/health.mjs      # live check: 2 requests to BaT (search + first page of results)
+```
+
+Unit tests need Node 18+ and no dependencies. They run on every pull request and push to `main` (`.github/workflows/ci.yml`). The fixtures in `test/fixtures/` are made-up records shaped like the API's, not copied BaT data.
+
+The live check runs daily (`.github/workflows/source-health.yml`). If it fails, it opens an issue labeled `source-broken`, or comments on the open one, and closes that issue once the check passes again. You can also run it by hand from the Actions tab.
 
 ## Host it
 
