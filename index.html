@@ -123,6 +123,24 @@ footer .wrap{padding-block:16px 28px}
 footer p{margin:0;max-width:90ch}
 .err{color:var(--bad)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* phones: filters collapse behind a toggle so results come first; 16px inputs stop iOS zooming in on focus */
+.ftoggle{display:none;font:inherit;font-weight:600;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:11px 14px;cursor:pointer}
+@media (max-width:860px){
+  .ftoggle{display:block}
+  aside:not(.open){display:none}
+  aside input[type=text],aside input[type=number],aside select,.ctrls select{font-size:16px!important}
+}
+@media (max-width:600px){td.t{min-width:200px} td img{width:56px;height:38px}}
+/* touch: tap targets closer to 44px */
+@media (pointer:coarse){
+  .chip,.examples button{padding:7px 12px}
+  .seg button{padding:8px 12px}
+  .mchip button{width:32px;height:32px}
+  .sugg button{padding:12px 14px}
+  .linkbtn,.lbl button{padding-block:8px}
+  .chk{min-height:36px}
+  .reset,.more button{padding:11px 16px}
+}
 </style>
 </head>
 <body>
@@ -156,7 +174,8 @@ footer p{margin:0;max-width:90ch}
   </section>
 
   <div class="layout" id="app" hidden>
-    <aside aria-label="Filters">
+    <button class="ftoggle" id="ftoggle" type="button" aria-expanded="false" aria-controls="filters">Show filters</button>
+    <aside aria-label="Filters" id="filters">
       <div class="fg"><label class="lbl" for="q">Search titles & descriptions</label>
         <input id="q" type="text" placeholder="one-owner, rod bearings, Speed Yellow…"></div>
       <div class="fg" id="g-model" hidden><div class="lbl">Model</div><div class="chips" id="f-model"></div></div>
@@ -366,7 +385,7 @@ function apply(){
     if(stock&&r.mod)return false;if(nr&&!r.nr)return false;
     if(q.length){for(const w of q)if(!r._s.includes(w))return false}
     return true});
-  shown=50;render()}
+  shown=50;hoverI=-1;$('#tip').hidden=true;render()}
 ['q','mi0','mi1','p0','p1'].forEach(id=>$('#'+id).addEventListener('input',apply));
 ['miunk','cur','y0','y1','yunk','d0','d1','stock','nr'].forEach(id=>$('#'+id).addEventListener('change',apply));
 $('#parts').addEventListener('change',()=>{lastSig='';setupFilters();apply()});
@@ -406,6 +425,7 @@ function renderTable(){
   $('#more').hidden=rows.length<=shown}
 $$('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortK===k)sortDir*=-1;else{sortK=k;sortDir=['t','tr','paint'].includes(k)?1:-1}renderTable()});
 $('#more').onclick=()=>{shown+=50;renderTable()};
+$('#ftoggle').onclick=()=>{const open=$('#filters').classList.toggle('open');$('#ftoggle').setAttribute('aria-expanded',open);$('#ftoggle').textContent=open?'Hide filters':'Show filters'};
 
 // ---------- chart ----------
 const cv=$('#chart'),ctx=cv.getContext('2d');let PTS=[],hoverI=-1,CATS=[];
@@ -456,13 +476,17 @@ function drawChart(){
   if(hoverI>=0&&PTS[hoverI]){const p=PTS[hoverI];ctx.beginPath();ctx.arc(p.x,p.y,7,0,7);ctx.strokeStyle=css('--fg');ctx.lineWidth=2;ctx.stroke()}
 }
 function nearest(ev){const b=cv.getBoundingClientRect(),mx=ev.clientX-b.left,my=ev.clientY-b.top;let bi=-1,bd=144;PTS.forEach((p,i)=>{const d=(p.x-mx)**2+(p.y-my)**2;if(d<bd){bd=d;bi=i}});return bi}
-cv.addEventListener('pointermove',ev=>{const i=nearest(ev);cv.style.cursor=i>=0?'pointer':'default';if(i===hoverI)return;hoverI=i;drawChart();
+function hover(i){cv.style.cursor=i>=0?'pointer':'default';if(i===hoverI)return;hoverI=i;drawChart();
   const tip=$('#tip');if(i<0){tip.hidden=true;return}const p=PTS[i],r=p.r,box=$('#chartbox');
   tip.innerHTML=`<img src="${esc(r.img)}" alt=""><strong>${esc(r.t)}</strong><div class="m">${r.sold?'Sold':'Bid to'} ${money(r.p,r.cur)} · ${fmtD(r.ts)}</div><div class="m">${r.mi!=null?r.mi.toLocaleString('en-US')+' mi':'miles unknown'}${r.tr?' · '+esc(r.tr):''}${r.paint?' · '+esc(r.paint):''}</div>`;
-  tip.hidden=false;let lx=p.x+14;if(lx+230>box.clientWidth)lx=p.x-244;tip.style.left=Math.max(0,lx)+'px';tip.style.top=Math.max(0,Math.min(p.y-60,box.clientHeight-tip.offsetHeight))+'px'});
-cv.addEventListener('pointerleave',()=>{hoverI=-1;$('#tip').hidden=true;drawChart()});
-cv.addEventListener('click',ev=>{const i=nearest(ev);if(i>=0)window.open(PTS[i].r.u,'_blank','noopener')});
-$$('[data-x]').forEach(b=>b.onclick=()=>{xMode=b.dataset.x;$$('[data-x]').forEach(o=>o.setAttribute('aria-pressed',o===b));hoverI=-1;drawChart()});
+  tip.hidden=false;let lx=p.x+14;if(lx+230>box.clientWidth)lx=p.x-244;tip.style.left=Math.max(0,lx)+'px';tip.style.top=Math.max(0,Math.min(p.y-60,box.clientHeight-tip.offsetHeight))+'px'}
+// touch has no hover: the first tap on a point shows its details, a second tap opens the listing
+let ptype='mouse';
+cv.addEventListener('pointerdown',ev=>ptype=ev.pointerType);
+cv.addEventListener('pointermove',ev=>{if(ev.pointerType==='mouse')hover(nearest(ev))});
+cv.addEventListener('pointerleave',ev=>{if(ev.pointerType!=='mouse')return;hoverI=-1;$('#tip').hidden=true;drawChart()});
+cv.addEventListener('click',ev=>{const i=nearest(ev);if(ptype!=='mouse'&&i!==hoverI){hover(i);return}if(i>=0)window.open(PTS[i].r.u,'_blank','noopener')});
+$$('[data-x]').forEach(b=>b.onclick=()=>{xMode=b.dataset.x;$$('[data-x]').forEach(o=>o.setAttribute('aria-pressed',o===b));hoverI=-1;$('#tip').hidden=true;drawChart()});
 $('#colorby').onchange=e=>{colorBy=e.target.value;drawChart()};
 new ResizeObserver(()=>drawChart()).observe($('#chartbox'));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawChart);
