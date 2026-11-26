@@ -5,7 +5,8 @@ import { createRequire } from 'node:module';
 
 const UA = 'AuctionComps-health-check (+https://github.com/DavidLuong98/auctioncomps)';
 const realFetch = globalThis.fetch;
-globalThis.fetch = (url, opts = {}) => realFetch(url, { ...opts, headers: { ...opts.headers, 'user-agent': UA } });
+// 30s per request, so a stalled connection fails fast instead of hanging the job
+globalThis.fetch = (url, opts = {}) => realFetch(url, { ...opts, signal: AbortSignal.timeout(30000), headers: { ...opts.headers, 'user-agent': UA } });
 
 createRequire(import.meta.url)('../core.js');
 const { BaT } = globalThis;

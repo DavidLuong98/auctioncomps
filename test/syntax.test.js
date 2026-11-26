@@ -7,7 +7,8 @@ const vm = require('node:vm');
 
 test('inline script in index.html compiles', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+  // every inline script (any attributes, but no src=)
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
   assert.ok(scripts.length > 0, 'found an inline script');
   for (const src of scripts) new vm.Script(src, { filename: 'index.html' });
 });

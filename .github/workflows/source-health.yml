@@ -14,6 +14,7 @@ permissions:
 jobs:
   bat:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -28,7 +29,12 @@ jobs:
         id: check
         continue-on-error: true
         shell: bash
-        run: node scripts/health.mjs 2>&1 | tee health.log
+        # one retry after a pause, so a brief throttle or outage doesn't open an issue
+        run: |
+          node scripts/health.mjs 2>&1 | tee health.log && exit 0
+          echo "Retrying in 2 minutes…" | tee -a health.log
+          sleep 120
+          node scripts/health.mjs 2>&1 | tee -a health.log
 
       - name: Open or update issue
         if: steps.check.outcome == 'failure'
@@ -38,9 +44,9 @@ jobs:
           {
             echo "The daily source health check failed for **Bring a Trailer**."
             echo
-            echo '```'
+            echo '`````'
             cat health.log
-            echo '```'
+            echo '`````'
             echo
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } > body.md
