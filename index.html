@@ -256,13 +256,16 @@ function paintSugg(note){const box=$('#sugg');box.innerHTML=sugg.map((r,i)=>`<bu
 async function addByUrl(v){$('#sugg').hidden=true;setStatus(0,'Looking up that model…');
   try{const m=await BaT.resolveUrl(v);if(!m){setStatus(null,'That link isn\'t a model page Bring a Trailer\'s search knows. Use a link like bringatrailer.com/porsche/996-gt3/, or search by name.',true);return}addModel(m)}
   catch(e){setStatus(null,'Could not reach Bring a Trailer. Check your connection and try again.',true)}}
+let pickSeq=0;   // bumped on every pick so a slower, older lookup can't overwrite a newer one
 async function addModel(m){$('#pick').value='';$('#sugg').hidden=true;
+  const seq=++pickSeq;
   if(MODELS.length===1&&MODELS[0].id===m.id)return;
   // umbrella page? swap in its generations
   setStatus(0,`Checking ${m.title}…`);
   let add=[m];
-  try{if(!(await BaT.countFor([m.id]))){const subs=await BaT.subModels(m);if(subs.length)add=subs.sort((a,b)=>a.title.localeCompare(b.title));else{setStatus(null,`${m.title} has no completed auctions.`,true);return}}}
-  catch(e){setStatus(null,'Could not reach Bring a Trailer. Check your connection and try again.',true);return}
+  try{if(!(await BaT.countFor([m.id]))){const subs=await BaT.subModels(m);if(subs.length)add=subs.sort((a,b)=>a.title.localeCompare(b.title));else{if(seq===pickSeq)setStatus(null,`${m.title} has no completed auctions.`,true);return}}}
+  catch(e){if(seq===pickSeq)setStatus(null,'Could not reach Bring a Trailer. Check your connection and try again.',true);return}
+  if(seq!==pickSeq)return;
   // picking a model replaces the current one(s) instead of stacking a second model filter
   MODELS=add;chip.model.clear();
   syncUrl();loadAll(false)}
@@ -469,8 +472,10 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawChart);
 
 // ---------- boot: ?m=bmw/e46-m3,bmw/e92-m3 ----------
 (async()=>{const m=new URL(location.href).searchParams.get('m');if(!m)return;
-  $('#welcome').hidden=true;setStatus(0,'Looking up models…');
-  for(const p of m.split(',').filter(Boolean)){try{const r=await BaT.resolveUrl('https://bringatrailer.com/'+p+'/');if(r&&!MODELS.some(x=>x.id===r.id))MODELS.push(r)}catch(e){}}
+  $('#welcome').hidden=true;setStatus(0,'Looking up models…');const seq=pickSeq,found=[];
+  for(const p of m.split(',').filter(Boolean)){try{const r=await BaT.resolveUrl('https://bringatrailer.com/'+p+'/');if(r&&!found.some(x=>x.id===r.id))found.push(r)}catch(e){}}
+  if(seq!==pickSeq)return;   // the user picked a model while the link was resolving
+  MODELS=found;
   if(!MODELS.length){setStatus(null,'Could not find the models in this link. Search for one above.',true);$('#welcome').hidden=false;return}
   loadAll(false)})();
 </script>
