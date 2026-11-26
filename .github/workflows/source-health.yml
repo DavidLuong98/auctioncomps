@@ -1,0 +1,70 @@
+name: Source health
+
+# Once a day, check that Bring a Trailer still answers the way core.js expects.
+# On failure, open (or comment on) a "source-broken" issue; when it passes again, close that issue.
+on:
+  schedule:
+    - cron: '17 14 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: 'Source broken: Bring a Trailer'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check Bring a Trailer
+        id: check
+        continue-on-error: true
+        shell: bash
+        # one retry after a pause, so a brief throttle or outage doesn't open an issue
+        run: |
+          node scripts/health.mjs 2>&1 | tee health.log && exit 0
+          echo "Retrying in 2 minutes…" | tee -a health.log
+          sleep 120
+          node scripts/health.mjs 2>&1 | tee -a health.log
+
+      - name: Open or update issue
+        if: steps.check.outcome == 'failure'
+        shell: bash
+        run: |
+          gh label create source-broken --color B60205 --description 'Daily source health check is failing' 2>/dev/null || true
+          {
+            echo "The daily source health check failed for **Bring a Trailer**."
+            echo
+            echo '`````'
+            cat health.log
+            echo '`````'
+            echo
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > body.md
+          n=$(gh issue list --label source-broken --state open --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file body.md
+          else
+            gh issue create --title "$TITLE" --label source-broken --body-file body.md
+          fi
+
+      - name: Close issue
+        if: steps.check.outcome == 'success'
+        shell: bash
+        run: |
+          for n in $(gh issue list --label source-broken --state open --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number"); do
+            gh issue close "$n" --comment "The source health check passes again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done
+
+      - name: Fail the run if the check failed
+        if: steps.check.outcome == 'failure'
+        run: exit 1
