@@ -385,7 +385,7 @@ function apply(){
     if(stock&&r.mod)return false;if(nr&&!r.nr)return false;
     if(q.length){for(const w of q)if(!r._s.includes(w))return false}
     return true});
-  shown=50;hoverI=-1;$('#tip').hidden=true;render()}
+  shown=50;hoverI=-1;$('#tip').hidden=true;paintToggle();render()}
 ['q','mi0','mi1','p0','p1'].forEach(id=>$('#'+id).addEventListener('input',apply));
 ['miunk','cur','y0','y1','yunk','d0','d1','stock','nr'].forEach(id=>$('#'+id).addEventListener('change',apply));
 $('#parts').addEventListener('change',()=>{lastSig='';setupFilters();apply()});
@@ -425,7 +425,12 @@ function renderTable(){
   $('#more').hidden=rows.length<=shown}
 $$('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortK===k)sortDir*=-1;else{sortK=k;sortDir=['t','tr','paint'].includes(k)?1:-1}renderTable()});
 $('#more').onclick=()=>{shown+=50;renderTable()};
-$('#ftoggle').onclick=()=>{const open=$('#filters').classList.toggle('open');$('#ftoggle').setAttribute('aria-expanded',open);$('#ftoggle').textContent=open?'Hide filters':'Show filters'};
+function activeFilters(){const full=(a,b)=>!$(a).value||($(a).value===$(a).dataset.lo&&$(b).value===$(b).dataset.hi);
+  return[$('#q').value.trim(),num('#mi0')!=null||num('#mi1')!=null,num('#p0')!=null||num('#p1')!=null,chip.status.size<2,chip.model.size,chip.body.size,chip.tr.size,chip.pc.size,chip.cc.size,
+    !full('#y0','#y1')||!$('#yunk').checked,!full('#d0','#d1'),$('#stock').checked,$('#nr').checked,$('#parts').checked].filter(Boolean).length}
+function paintToggle(){const open=$('#filters').classList.contains('open'),n=activeFilters();
+  $('#ftoggle').setAttribute('aria-expanded',open);$('#ftoggle').textContent=(open?'Hide filters':'Show filters')+(n?` (${n} active)`:'')}
+$('#ftoggle').onclick=()=>{$('#filters').classList.toggle('open');paintToggle()};
 
 // ---------- chart ----------
 const cv=$('#chart'),ctx=cv.getContext('2d');let PTS=[],hoverI=-1,CATS=[];
@@ -479,16 +484,20 @@ function nearest(ev){const b=cv.getBoundingClientRect(),mx=ev.clientX-b.left,my=
 function hover(i){cv.style.cursor=i>=0?'pointer':'default';if(i===hoverI)return;hoverI=i;drawChart();
   const tip=$('#tip');if(i<0){tip.hidden=true;return}const p=PTS[i],r=p.r,box=$('#chartbox');
   tip.innerHTML=`<img src="${esc(r.img)}" alt=""><strong>${esc(r.t)}</strong><div class="m">${r.sold?'Sold':'Bid to'} ${money(r.p,r.cur)} · ${fmtD(r.ts)}</div><div class="m">${r.mi!=null?r.mi.toLocaleString('en-US')+' mi':'miles unknown'}${r.tr?' · '+esc(r.tr):''}${r.paint?' · '+esc(r.paint):''}</div>`;
-  tip.hidden=false;let lx=p.x+14;if(lx+230>box.clientWidth)lx=p.x-244;tip.style.left=Math.max(0,lx)+'px';tip.style.top=Math.max(0,Math.min(p.y-60,box.clientHeight-tip.offsetHeight))+'px'}
+  tip.hidden=false;const bw=box.clientWidth,bh=box.clientHeight,th=tip.offsetHeight;let lx=p.x+14,ty=Math.min(p.y-60,bh-th);if(lx+230>bw)lx=p.x-244;
+  if(lx<0){lx=Math.max(0,Math.min(p.x-115,bw-230));ty=p.y>bh/2?p.y-th-12:p.y+12}   // narrow chart: neither side fits, go above/below
+  tip.style.left=lx+'px';tip.style.top=Math.max(0,ty)+'px'}
+function hideTip(){if(hoverI<0&&$('#tip').hidden)return;hoverI=-1;$('#tip').hidden=true;drawChart()}
 // touch has no hover: the first tap on a point shows its details, a second tap opens the listing
 let ptype='mouse';
 cv.addEventListener('pointerdown',ev=>ptype=ev.pointerType);
-cv.addEventListener('pointermove',ev=>{if(ev.pointerType==='mouse')hover(nearest(ev))});
-cv.addEventListener('pointerleave',ev=>{if(ev.pointerType!=='mouse')return;hoverI=-1;$('#tip').hidden=true;drawChart()});
-cv.addEventListener('click',ev=>{const i=nearest(ev);if(ptype!=='mouse'&&i!==hoverI){hover(i);return}if(i>=0)window.open(PTS[i].r.u,'_blank','noopener')});
+cv.addEventListener('pointermove',ev=>{if(ev.pointerType!=='touch')hover(nearest(ev))});
+cv.addEventListener('pointerleave',ev=>{if(ev.pointerType!=='touch')hideTip()});
+cv.addEventListener('click',ev=>{const i=nearest(ev);if(ptype==='touch'&&i!==hoverI){hover(i);return}if(i>=0)window.open(PTS[i].r.u,'_blank','noopener')});
+document.addEventListener('pointerdown',ev=>{if(ev.target!==cv)hideTip()});
 $$('[data-x]').forEach(b=>b.onclick=()=>{xMode=b.dataset.x;$$('[data-x]').forEach(o=>o.setAttribute('aria-pressed',o===b));hoverI=-1;$('#tip').hidden=true;drawChart()});
 $('#colorby').onchange=e=>{colorBy=e.target.value;drawChart()};
-new ResizeObserver(()=>drawChart()).observe($('#chartbox'));
+new ResizeObserver(()=>{hoverI=-1;$('#tip').hidden=true;drawChart()}).observe($('#chartbox'));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawChart);
 
 // ---------- boot: ?m=bmw/e46-m3,bmw/e92-m3 ----------
