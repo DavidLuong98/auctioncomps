@@ -2,7 +2,7 @@
 
 Filter completed Bring a Trailer auctions by mileage, price, model year, transmission, body, color, country and more, for any model. BaT's own results page has none of these filters.
 
-Search for a model, or paste a model page URL like `https://bringatrailer.com/porsche/996-gt3/`. You can add several models to compare them. Umbrella pages such as `/mazda/miata/` expand into their generations automatically.
+Search for a model, or paste a model page URL like `https://bringatrailer.com/porsche/996-gt3/`. Umbrella pages such as `/mazda/miata/` expand into their generations automatically.
 
 ## How it works
 

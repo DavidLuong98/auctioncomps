@@ -146,7 +146,6 @@ footer p{margin:0;max-width:90ch}
   <section class="welcome" id="welcome">
     <h2>Pick a model to start</h2>
     <p>Search above or paste a model page link like <code>bringatrailer.com/bmw/e46-m3/</code>. Every completed auction loads straight from Bring a Trailer into your browser. A big model takes under a minute the first time, and it stays cached on your device for next time.</p>
-    <p>Add more than one model to compare them, like E46 M3 against E92 M3.</p>
     <div class="examples">Try:
       <button data-ex="https://bringatrailer.com/bmw/e46-m3/">BMW E46 M3</button>
       <button data-ex="https://bringatrailer.com/porsche/996-gt3/">Porsche 996 GT3</button>
@@ -258,13 +257,14 @@ async function addByUrl(v){$('#sugg').hidden=true;setStatus(0,'Looking up that m
   try{const m=await BaT.resolveUrl(v);if(!m){setStatus(null,'That link isn\'t a model page Bring a Trailer\'s search knows. Use a link like bringatrailer.com/porsche/996-gt3/, or search by name.',true);return}addModel(m)}
   catch(e){setStatus(null,'Could not reach Bring a Trailer. Check your connection and try again.',true)}}
 async function addModel(m){$('#pick').value='';$('#sugg').hidden=true;
-  if(MODELS.some(x=>x.id===m.id))return;
+  if(MODELS.length===1&&MODELS[0].id===m.id)return;
   // umbrella page? swap in its generations
   setStatus(0,`Checking ${m.title}…`);
   let add=[m];
   try{if(!(await BaT.countFor([m.id]))){const subs=await BaT.subModels(m);if(subs.length)add=subs.sort((a,b)=>a.title.localeCompare(b.title));else{setStatus(null,`${m.title} has no completed auctions.`,true);return}}}
   catch(e){setStatus(null,'Could not reach Bring a Trailer. Check your connection and try again.',true);return}
-  for(const a of add)if(!MODELS.some(x=>x.id===a.id))MODELS.push(a);
+  // picking a model replaces the current one(s) instead of stacking a second model filter
+  MODELS=add;chip.model.clear();
   syncUrl();loadAll(false)}
 function removeModel(id){MODELS=MODELS.filter(m=>m.id!==id);chip.model.delete(id);syncUrl();loadAll(false)}
 function paintModels(){$('#models').innerHTML=MODELS.map(m=>`<span class="mchip"><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.title)}</a><button aria-label="Remove ${esc(m.title)}" data-rm="${esc(m.id)}">✕</button></span>`).join('');
