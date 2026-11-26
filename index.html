@@ -137,7 +137,7 @@ footer p{margin:0;max-width:90ch}
   .seg button{padding:8px 12px}
   .mchip button{width:32px;height:32px}
   .sugg button{padding:12px 14px}
-  .linkbtn,.lbl button{padding-block:8px}
+  .linkbtn,.lbl button{padding-block:8px;margin-block:-8px}   /* bigger hit area, same layout */
   .chk{min-height:36px}
   .reset,.more button{padding:11px 16px}
 }
@@ -497,7 +497,8 @@ cv.addEventListener('click',ev=>{const i=nearest(ev);if(ptype==='touch'&&i!==hov
 document.addEventListener('pointerdown',ev=>{if(ev.target!==cv)hideTip()});
 $$('[data-x]').forEach(b=>b.onclick=()=>{xMode=b.dataset.x;$$('[data-x]').forEach(o=>o.setAttribute('aria-pressed',o===b));hoverI=-1;$('#tip').hidden=true;drawChart()});
 $('#colorby').onchange=e=>{colorBy=e.target.value;drawChart()};
-new ResizeObserver(()=>{hoverI=-1;$('#tip').hidden=true;drawChart()}).observe($('#chartbox'));
+let chartW=0;   // a width change (e.g. phone rotation) moves every point, so drop the tooltip then
+new ResizeObserver(()=>{const w=$('#chartbox').clientWidth;if(w!==chartW){chartW=w;hoverI=-1;$('#tip').hidden=true}drawChart()}).observe($('#chartbox'));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawChart);
 
 // ---------- boot: ?m=bmw/e46-m3,bmw/e92-m3 ----------
